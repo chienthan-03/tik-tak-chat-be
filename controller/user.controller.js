@@ -1,6 +1,8 @@
 const asyncHandler = require("express-async-handler");
 const generateToken = require("../config/generateToken");
 const User = require("../models/user.model");
+const bcrypt = require("bcryptjs");
+
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password, pic } = req.body;
 
@@ -62,4 +64,47 @@ const allUsers = asyncHandler(async (req, res) => {
   res.send(users);
 });
 
-module.exports = { registerUser, authUser, allUsers };
+const editprofile = asyncHandler(async (req, res) => {
+  const { pic, name, idUser } = req.body;
+  if (!idUser) {
+    res.status(400);
+    throw new Error("Please enter all the Field");
+  }
+  const editUser = await User.findByIdAndUpdate(idUser, {
+    pic: pic,
+    name: name,
+  }).select("-password");
+  res.status(200).json(editUser);
+});
+
+const editpassword = asyncHandler(async (req, res) => {
+  const { password, email, newPassword } = req.body;
+  if (!password || !email || !newPassword) {
+    res.status(400);
+    throw new Error("Please enter all the Field");
+  }
+  const user = await User.findOne({ email });
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(newPassword, salt);
+  if (user && (await user.matchPassword(password))) {
+    const editUser = await User.findOneAndUpdate(
+      { email: email },
+      {
+        $set: { password: passwordHash },
+      },
+      { new: true }
+    ).select("-password");
+    res.status(200).json(editUser);
+  } else {
+    res.status(401);
+    throw new Error("Invalid Enter or Password");
+  }
+});
+
+module.exports = {
+  registerUser,
+  authUser,
+  allUsers,
+  editpassword,
+  editprofile,
+};

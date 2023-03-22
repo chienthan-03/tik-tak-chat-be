@@ -117,7 +117,7 @@ const renameGroup = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error("chat not found");
   } else {
-    res.json(updateChat);
+    res.status(200).json(updateChat);
   }
 });
 
