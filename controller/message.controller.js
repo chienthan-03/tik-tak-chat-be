@@ -44,4 +44,20 @@ const allMessages = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { sendMessage, allMessages };
+const deleteMessages = asyncHandler(async (req, res) => {
+  try {
+    const message = await Message.findById(req.params.messageId);
+    if (req.body.userId == message.sender._id && !message.isRemove) {
+      message.isRemove = true;
+      message.content = "messages was deleted";
+      await message.save();
+      const newMessages = await Message.findById(req.params.messageId);
+      res.status(200).json(newMessages);
+    }
+  } catch (error) {
+    res.status(400);
+    throw new Error(error.message);
+  }
+});
+
+module.exports = { sendMessage, allMessages, deleteMessages };
