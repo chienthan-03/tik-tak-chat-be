@@ -8,7 +8,7 @@ const {
 const router = express.Router();
 
 router.route("/:chatId").get(protect, allMessages);
-router.route("/remove/:messageId").put(protect, deleteMessages);
+router.route("/remove/:messageId").delete(protect, deleteMessages);
 router.route("/").post(protect, sendMessage);
 
 module.exports = router;
