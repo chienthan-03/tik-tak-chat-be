@@ -28,7 +28,7 @@ app.use(errorHandler);
 
 const io = require("socket.io")(server, {
   cors: {
-    origin: "https://tiktak-gamma.vercel.app/",
+    origin: "http://localhost:3000",
     // https://tiktak-gamma.vercel.app
   },
 });
