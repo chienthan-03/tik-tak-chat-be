@@ -48,23 +48,16 @@ const deleteMessages = asyncHandler(async (req, res) => {
   try {
     const message = await Message.findById(req.params.messageId);
 
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
+    if (req.body.userId == message.sender._id && !message.isRemove) {
+      message.isRemove = true;
+      message.content = "messages was deleted";
+      await message.save();
+      const newMessages = await Message.findById(req.params.messageId);
+      res.status(200).json(newMessages);
     }
-
-    // Kiểm tra xem người gửi yêu cầu có phải là người gửi tin nhắn hay không
-    if (req.user._id.toString() !== message.sender._id.toString()) {
-      return res
-        .status(403)
-        .json({ message: "You are not authorized to delete this message" });
-    }
-
-    // Xóa tin nhắn
-    await message.remove();
-
-    res.status(200).json({ message: "Message deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(400);
+    throw new Error(error.message);
   }
 });
 
