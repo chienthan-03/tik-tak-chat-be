@@ -28,7 +28,7 @@ app.use(errorHandler);
 
 const io = require("socket.io")(server, {
   cors: {
-    origin: "https://tiktak-gamma.vercel.app",
+    origin: "http://localhost:3000",
     // https://tiktak-gamma.vercel.app
   },
 });
@@ -48,6 +48,25 @@ io.on("connection", (socket) => {
 
   socket.on("typing", (room) => socket.in(room).emit("typing"));
   socket.on("stop typing", (room) => socket.in(room).emit("stop typing"));
+
+  //call video
+  socket.on("offer", (data) => {
+    socket.broadcast.emit("offer", data);
+  });
+
+  socket.on("answer", (data) => {
+    socket.broadcast.emit("answer", data);
+  });
+
+  socket.on("candidate", (data) => {
+    socket.broadcast.emit("candidate", data);
+  });
+
+  // Xử lý khi kết thúc cuộc gọi
+  socket.on("endCall", () => {
+    console.log("Call ended");
+    io.emit("callEnded");
+  });
 
   socket.on("new message", (newMessageRecieved) => {
     var chat = newMessageRecieved.chat;

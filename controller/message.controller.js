@@ -61,4 +61,56 @@ const deleteMessages = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { sendMessage, allMessages, deleteMessages };
+const getPaginatedMessages = asyncHandler(async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 50;
+    const skip = (page - 1) * pageSize;
+
+    if (pageSize > 1000) {
+      return res.status(400).json({ message: "Page size cannot exceed 1000" });
+    }
+
+    const totalMessages = await Message.countDocuments({
+      chat: req.params.chatId,
+    });
+
+    if (skip >= totalMessages) {
+      return res.status(200).json({
+        messages: [],
+        currentPage: page,
+        pageSize,
+        hasMore: false,
+        totalMessages,
+      });
+    }
+
+    const adjustedSkip = Math.max(totalMessages - skip - pageSize, 0);
+
+    const messages = await Message.find({ chat: req.params.chatId })
+      .skip(adjustedSkip)
+      .limit(pageSize)
+      .populate("sender", "name pic email")
+      .populate("chat");
+
+    const hasMore = skip + pageSize < totalMessages;
+
+    res.status(200).json({
+      messages,
+      currentPage: page,
+      pageSize,
+      hasMore,
+      totalMessages,
+    });
+  } catch (error) {
+    res.status(400);
+    throw new Error(error.message);
+  }
+});
+
+module.exports = {
+  sendMessage,
+  allMessages,
+  deleteMessages,
+  getPaginatedMessages,
+};
