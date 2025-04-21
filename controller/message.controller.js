@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Chat = require("../models/chat.models");
 const Message = require("../models/message.model");
 const User = require("../models/user.model");
+
 const sendMessage = asyncHandler(async (req, res) => {
   const { content, chatId } = req.body;
   if (!content || !chatId) {
@@ -108,9 +109,34 @@ const getPaginatedMessages = asyncHandler(async (req, res) => {
   }
 });
 
+const searchMessages = asyncHandler(async (req, res) => {
+  try {
+    const { query } = req.query;
+    const chatId = req.params.chatId;
+
+    if (!query) {
+      return res.status(400).json({ message: "Search query is required" });
+    }
+
+    const messages = await Message.find({
+      chat: chatId,
+      content: { $regex: query, $options: "i" },
+      isRemove: false,
+    })
+      .populate("sender", "name pic email")
+      .populate("chat");
+
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(400);
+    throw new Error(error.message);
+  }
+});
+
 module.exports = {
   sendMessage,
   allMessages,
   deleteMessages,
   getPaginatedMessages,
+  searchMessages,
 };
