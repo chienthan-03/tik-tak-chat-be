@@ -50,22 +50,45 @@ io.on("connection", (socket) => {
   socket.on("stop typing", (room) => socket.in(room).emit("stop typing"));
 
   //call video
+  socket.on("initiateCall", (data) => {
+    console.log("Initiating call:", data);
+    socket.to(data.to).emit("incomingCall", data);
+  });
+
   socket.on("offer", (data) => {
-    socket.broadcast.emit("offer", data);
+    console.log("Offer received:", {
+      to: data.to,
+      from: data.from || socket.id,
+      hasOffer: !!data.offer
+    });
+    socket.to(data.to).emit("offer", data);
+    console.log("Offer forwarded to:", data.to);
   });
 
   socket.on("answer", (data) => {
-    socket.broadcast.emit("answer", data);
+    console.log("Answer received:", {
+      to: data.to,
+      from: data.from || socket.id,
+      hasAnswer: !!data.answer
+    });
+    socket.to(data.to).emit("answer", data);
+    console.log("Answer forwarded to:", data.to);
   });
 
   socket.on("candidate", (data) => {
-    socket.broadcast.emit("candidate", data);
+    console.log("ICE candidate received:", {
+      to: data.to,
+      from: data.from || socket.id,
+      candidateType: data.candidate?.candidate?.split(' ')[7] || 'unknown'
+    });
+    socket.to(data.to).emit("candidate", data);
+    console.log("ICE candidate forwarded to:", data.to);
   });
 
   // Xử lý khi kết thúc cuộc gọi
-  socket.on("endCall", () => {
-    console.log("Call ended");
-    io.emit("callEnded");
+  socket.on("endCall", (data) => {
+    console.log("Call ended for:", data.to);
+    socket.to(data.to).emit("callEnded", data);
   });
 
   socket.on("new message", (newMessageRecieved) => {
@@ -81,3 +104,4 @@ io.on("connection", (socket) => {
     console.log("Disconnected due to:", reason);
   });
 });
+
