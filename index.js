@@ -33,12 +33,26 @@ const io = require("socket.io")(server, {
   },
 });
 
+// Track online users
+const onlineUsers = new Map();
+
 io.on("connection", (socket) => {
   console.log("connected to socket.io");
   socket.on("setup", (userData) => {
-    socket.join(userData._id);
-    console.log("setup:", userData._id);
-    socket.emit("connected");
+    if (userData && userData._id) {
+      socket.join(userData._id);
+      console.log("setup:", userData._id);
+      // Mark user as online
+      onlineUsers.set(userData._id, socket.id);
+      // Broadcast to all clients that this user is online
+      io.emit("user_status_update", {
+        userId: userData._id,
+        status: "online"
+      });
+      // Send the current online users list to the newly connected user
+      socket.emit("online_users", Array.from(onlineUsers.keys()));
+      socket.emit("connected");
+    }
   });
 
   socket.on("join chat", (room) => {
@@ -102,6 +116,19 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", (reason) => {
     console.log("Disconnected due to:", reason);
+    
+    // Find the user who disconnected and remove from online users
+    for (const [userId, socketId] of onlineUsers.entries()) {
+      if (socketId === socket.id) {
+        onlineUsers.delete(userId);
+        // Broadcast to all clients that this user is offline
+        io.emit("user_status_update", {
+          userId: userId,
+          status: "offline"
+        });
+        break;
+      }
+    }
   });
 });
 
