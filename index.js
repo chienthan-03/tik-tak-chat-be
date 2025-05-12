@@ -34,7 +34,8 @@ const io = require("socket.io")(server, {
 });
 
 // Track online users
-const onlineUsers = new Map();
+const onlineUsers = new Map(); // userId -> Set of socketIds
+const userSockets = new Map(); // socketId -> userId
 
 io.on("connection", (socket) => {
   console.log("connected to socket.io");
@@ -42,16 +43,42 @@ io.on("connection", (socket) => {
     if (userData && userData._id) {
       socket.join(userData._id);
       console.log("setup:", userData._id);
-      // Mark user as online
-      onlineUsers.set(userData._id, socket.id);
-      // Broadcast to all clients that this user is online
-      io.emit("user_status_update", {
-        userId: userData._id,
-        status: "online"
-      });
+      
+      // Store the mapping of socket to user
+      userSockets.set(socket.id, userData._id);
+      
+      // Add this socket to the user's set of connections
+      if (!onlineUsers.has(userData._id)) {
+        onlineUsers.set(userData._id, new Set([socket.id]));
+        // Broadcast to all clients that this user is online
+        io.emit("user_status_update", {
+          userId: userData._id,
+          status: "online"
+        });
+      } else {
+        // Add this socket to existing connections
+        onlineUsers.get(userData._id).add(socket.id);
+      }
+      
       // Send the current online users list to the newly connected user
       socket.emit("online_users", Array.from(onlineUsers.keys()));
       socket.emit("connected");
+    }
+  });
+  
+  // Handle explicit maintain online status requests
+  socket.on("maintainOnlineStatus", (data) => {
+    if (data && data.userId) {
+      console.log("Maintaining online status for:", data.userId);
+      // Ensure user stays marked as online
+      if (!onlineUsers.has(data.userId)) {
+        onlineUsers.set(data.userId, new Set());
+        // Broadcast status update
+        io.emit("user_status_update", {
+          userId: data.userId,
+          status: "online"
+        });
+      }
     }
   });
 
@@ -117,16 +144,25 @@ io.on("connection", (socket) => {
   socket.on("disconnect", (reason) => {
     console.log("Disconnected due to:", reason);
     
-    // Find the user who disconnected and remove from online users
-    for (const [userId, socketId] of onlineUsers.entries()) {
-      if (socketId === socket.id) {
-        onlineUsers.delete(userId);
-        // Broadcast to all clients that this user is offline
-        io.emit("user_status_update", {
-          userId: userId,
-          status: "offline"
-        });
-        break;
+    // Get the userId associated with this socket
+    const userId = userSockets.get(socket.id);
+    if (userId) {
+      // Remove this socket from the user's connections
+      userSockets.delete(socket.id);
+      
+      if (onlineUsers.has(userId)) {
+        const userConnections = onlineUsers.get(userId);
+        userConnections.delete(socket.id);
+        
+        // Only mark user as offline if they have no more connections
+        if (userConnections.size === 0) {
+          onlineUsers.delete(userId);
+          // Broadcast offline status
+          io.emit("user_status_update", {
+            userId: userId,
+            status: "offline"
+          });
+        }
       }
     }
   });
