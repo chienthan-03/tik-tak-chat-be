@@ -36,6 +36,8 @@ const io = require("socket.io")(server, {
 // Track online users
 const onlineUsers = new Map(); // userId -> Set of socketIds
 const userSockets = new Map(); // socketId -> userId
+// Track last active time for users
+const lastActive = new Map(); // userId -> timestamp
 
 io.on("connection", (socket) => {
   console.log("connected to socket.io");
@@ -53,7 +55,8 @@ io.on("connection", (socket) => {
         // Broadcast to all clients that this user is online
         io.emit("user_status_update", {
           userId: userData._id,
-          status: "online"
+          status: "online",
+          lastActive: lastActive.get(userData._id) || null,
         });
       } else {
         // Add this socket to existing connections
@@ -76,10 +79,16 @@ io.on("connection", (socket) => {
         // Broadcast status update
         io.emit("user_status_update", {
           userId: data.userId,
-          status: "online"
+          status: "online",
+          lastActive: lastActive.get(data.userId) || null,
         });
       }
     }
+  });
+
+  // Allow clients to fetch last active time for a user
+  socket.on("getLastActive", (userId, callback) => {
+    callback(lastActive.get(userId) || null);
   });
 
   socket.on("join chat", (room) => {
@@ -164,10 +173,13 @@ io.on("connection", (socket) => {
         // Only mark user as offline if they have no more connections
         if (userConnections.size === 0) {
           onlineUsers.delete(userId);
-          // Broadcast offline status
+          // Set last active time
+          lastActive.set(userId, Date.now());
+          // Broadcast offline status and last active
           io.emit("user_status_update", {
             userId: userId,
-            status: "offline"
+            status: "offline",
+            lastActive: lastActive.get(userId),
           });
         }
       }
