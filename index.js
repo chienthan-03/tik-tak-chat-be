@@ -10,10 +10,11 @@ const cors = require("cors");
 
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const port = process.env.PORT;
-// const path = require("path");
 
 app.use(express.json()); //to accept JSON data
 app.use(cors());
+
+// Không cần serve static files nữa vì sử dụng Cloudinary
 
 connectDB();
 
@@ -45,10 +46,10 @@ io.on("connection", (socket) => {
     if (userData && userData._id) {
       socket.join(userData._id);
       console.log("setup:", userData._id);
-      
+
       // Store the mapping of socket to user
       userSockets.set(socket.id, userData._id);
-      
+
       // Add this socket to the user's set of connections
       if (!onlineUsers.has(userData._id)) {
         onlineUsers.set(userData._id, new Set([socket.id]));
@@ -62,13 +63,13 @@ io.on("connection", (socket) => {
         // Add this socket to existing connections
         onlineUsers.get(userData._id).add(socket.id);
       }
-      
+
       // Send the current online users list to the newly connected user
       socket.emit("online_users", Array.from(onlineUsers.keys()));
       socket.emit("connected");
     }
   });
-  
+
   // Handle explicit maintain online status requests
   socket.on("maintainOnlineStatus", (data) => {
     if (data && data.userId) {
@@ -116,7 +117,7 @@ io.on("connection", (socket) => {
     console.log("Offer received:", {
       to: data.to,
       from: data.from || socket.id,
-      hasOffer: !!data.offer
+      hasOffer: !!data.offer,
     });
     socket.to(data.to).emit("offer", data);
     console.log("Offer forwarded to:", data.to);
@@ -126,7 +127,7 @@ io.on("connection", (socket) => {
     console.log("Answer received:", {
       to: data.to,
       from: data.from || socket.id,
-      hasAnswer: !!data.answer
+      hasAnswer: !!data.answer,
     });
     socket.to(data.to).emit("answer", data);
     console.log("Answer forwarded to:", data.to);
@@ -136,7 +137,7 @@ io.on("connection", (socket) => {
     console.log("ICE candidate received:", {
       to: data.to,
       from: data.from || socket.id,
-      candidateType: data.candidate?.candidate?.split(' ')[7] || 'unknown'
+      candidateType: data.candidate?.candidate?.split(" ")[7] || "unknown",
     });
     socket.to(data.to).emit("candidate", data);
     console.log("ICE candidate forwarded to:", data.to);
@@ -159,31 +160,27 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", (reason) => {
     console.log("Disconnected due to:", reason);
-    
-    // Get the userId associated with this socket
+
     const userId = userSockets.get(socket.id);
     if (userId) {
-      // Remove this socket from the user's connections
       userSockets.delete(socket.id);
-      
+
       if (onlineUsers.has(userId)) {
         const userConnections = onlineUsers.get(userId);
         userConnections.delete(socket.id);
-        
-        // Only mark user as offline if they have no more connections
+
         if (userConnections.size === 0) {
           onlineUsers.delete(userId);
-          // Set last active time
-          lastActive.set(userId, Date.now());
-          // Broadcast offline status and last active
+          const timestamp = Date.now();
+          lastActive.set(userId, timestamp);
+
           io.emit("user_status_update", {
             userId: userId,
             status: "offline",
-            lastActive: lastActive.get(userId),
+            lastActive: timestamp,
           });
         }
       }
     }
   });
 });
-

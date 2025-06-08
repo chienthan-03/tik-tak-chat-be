@@ -33,6 +33,56 @@ const sendMessage = asyncHandler(async (req, res) => {
   }
 });
 
+// Gửi tin nhắn có ảnh
+const sendImageMessage = asyncHandler(async (req, res) => {
+  const { chatId, caption } = req.body;
+
+  if (!chatId) {
+    return res.status(400).json({ message: "Chat ID is required" });
+  }
+
+  if (!req.processedFile) {
+    return res.status(400).json({ message: "No image file provided" });
+  }
+
+  try {
+    const newMessage = {
+      sender: req.user._id,
+      content: caption || "", // Caption có thể rỗng
+      chat: chatId,
+      messageType: "image",
+      imageUrl: req.processedFile.cloudinary_url,
+      imageData: {
+        filename: req.processedFile.filename,
+        originalname: req.processedFile.originalname,
+        size: req.processedFile.size,
+        mimetype: req.processedFile.mimetype,
+        public_id: req.processedFile.public_id, // Cloudinary public_id
+      },
+    };
+
+    let message = await Message.create(newMessage);
+
+    message = await message.populate("sender", "name pic");
+    message = await message.populate("chat");
+    message = await User.populate(message, {
+      path: "chat.users",
+      select: "name pic email",
+    });
+
+    await Chat.findByIdAndUpdate(chatId, {
+      latestMessage: message,
+    });
+
+    res.json(message);
+  } catch (error) {
+    // Với Cloudinary, ảnh đã được upload nên không cần xóa local files
+    // Có thể thêm logic xóa ảnh trên Cloudinary nếu cần thiết
+    res.status(400);
+    throw new Error(error.message);
+  }
+});
+
 const allMessages = asyncHandler(async (req, res) => {
   try {
     const messages = await Message.find({ chat: req.params.chatId })
@@ -135,6 +185,7 @@ const searchMessages = asyncHandler(async (req, res) => {
 
 module.exports = {
   sendMessage,
+  sendImageMessage,
   allMessages,
   deleteMessages,
   getPaginatedMessages,
