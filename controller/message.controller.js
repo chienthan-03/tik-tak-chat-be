@@ -136,15 +136,15 @@ const getPaginatedMessages = asyncHandler(async (req, res) => {
       });
     }
 
-    const adjustedSkip = Math.max(totalMessages - skip - pageSize, 0);
-
-    const messages = await Message.find({ chat: req.params.chatId })
-      .skip(adjustedSkip)
+    let messages = await Message.find({ chat: req.params.chatId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
       .limit(pageSize)
       .populate("sender", "name pic email")
       .populate("chat");
 
-    const hasMore = skip + pageSize < totalMessages;
+    messages = messages.reverse();
+    const hasMore = skip + messages.length < totalMessages;
 
     res.status(200).json({
       messages,

@@ -95,6 +95,22 @@ io.on("connection", (socket) => {
   socket.on("join chat", (room) => {
     socket.join(room);
     console.log("User joined room: ", room);
+    console.log("Socket", socket.id, "is now in rooms:", Array.from(socket.rooms));
+    
+    // Notify others in the room that this user joined
+    socket.to(room).emit("user_joined_room", {
+      socketId: socket.id,
+      room: room
+    });
+    
+    // Send current room members to the joining user
+    const roomMembers = io.sockets.adapter.rooms.get(room);
+    if (roomMembers) {
+      socket.emit("room_members", {
+        room: room,
+        members: Array.from(roomMembers)
+      });
+    }
   });
 
   socket.on("typing", (room) => {
@@ -113,14 +129,38 @@ io.on("connection", (socket) => {
     socket.to(data.to).emit("incomingCall", data);
   });
 
+  // New event: receiver ready to receive offer
+  socket.on("receiver_ready", (data) => {
+    console.log("📞 Receiver ready for call in room:", data.chatId);
+    console.log("📞 Notifying room members that receiver is ready");
+    
+    // Notify the room that receiver is ready
+    socket.to(data.chatId).emit("receiver_ready_notification", {
+      chatId: data.chatId,
+      receiverId: data.userId
+    });
+  });
+
   socket.on("offer", (data) => {
-    console.log("Offer received:", {
+    console.log("📥 Offer received from socket:", socket.id);
+    console.log("📥 Offer data:", {
       to: data.to,
       from: data.from || socket.id,
       hasOffer: !!data.offer,
+      offerType: data.offer?.type,
     });
+    console.log("📥 Socket rooms:", Array.from(socket.rooms));
+    
+    // Check if the target room exists and has members
+    const targetRoom = io.sockets.adapter.rooms.get(data.to);
+    console.log("📥 Target room", data.to, "members:", targetRoom ? Array.from(targetRoom) : "Room not found");
+    
     socket.to(data.to).emit("offer", data);
-    console.log("Offer forwarded to:", data.to);
+    console.log("📤 Offer forwarded to room:", data.to);
+    
+    // Also emit to all sockets in the room for debugging
+    const socketsInRoom = targetRoom ? Array.from(targetRoom) : [];
+    console.log("📤 Sockets that should receive offer:", socketsInRoom);
   });
 
   socket.on("answer", (data) => {
@@ -141,6 +181,12 @@ io.on("connection", (socket) => {
     });
     socket.to(data.to).emit("candidate", data);
     console.log("ICE candidate forwarded to:", data.to);
+  });
+
+  // Xử lý khi từ chối cuộc gọi
+  socket.on("callRejected", (data) => {
+    console.log("Call rejected for:", data.to, "chatId:", data.chatId);
+    socket.to(data.to).emit("callRejected", data);
   });
 
   // Xử lý khi kết thúc cuộc gọi
